@@ -32,6 +32,19 @@ async def get_or_create_user(telegram_id: int, name: str) -> User:
         return user
 
 
+async def _next_task_number(session, user_id: int) -> int:
+    result = await session.execute(
+        select(Task.task_number).where(
+            and_(Task.user_id == user_id, Task.status != "cancelled", Task.task_number.isnot(None))
+        )
+    )
+    used = set(r[0] for r in result.fetchall())
+    n = 1
+    while n in used:
+        n += 1
+    return n
+
+
 async def create_task(
     user_id: int,
     title: str,
@@ -43,6 +56,7 @@ async def create_task(
     reminder_minutes: int = None,
 ) -> Task:
     async with SessionLocal() as session:
+        number = await _next_task_number(session, user_id)
         task = Task(
             user_id=user_id,
             title=title,
@@ -52,6 +66,7 @@ async def create_task(
             priority=priority,
             description=description,
             reminder_minutes=reminder_minutes,
+            task_number=number,
         )
         session.add(task)
         await session.commit()
@@ -71,7 +86,7 @@ async def get_tasks_today(user_id: int) -> list[Task]:
                     Task.scheduled_at >= today_start,
                     Task.scheduled_at < today_end,
                 )
-            ).order_by(Task.scheduled_at)
+            ).order_by(Task.scheduled_at.nulls_last(), Task.created_at)
         )
         return result.scalars().all()
 
@@ -88,7 +103,7 @@ async def get_tasks_week(user_id: int) -> list[Task]:
                     Task.scheduled_at >= today_start,
                     Task.scheduled_at < week_end,
                 )
-            ).order_by(Task.scheduled_at)
+            ).order_by(Task.scheduled_at.nulls_last(), Task.created_at)
         )
         return result.scalars().all()
 
@@ -133,6 +148,59 @@ async def delete_task(task_id: int, user_id: int) -> bool:
         task = result.scalar_one_or_none()
         if task:
             task.status = "cancelled"
+            task.updated_at = datetime.now()
+            await session.commit()
+            return True
+        return False
+
+
+async def delete_all_tasks(user_id: int) -> int:
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Task).where(and_(Task.user_id == user_id, Task.status != "cancelled"))
+        )
+        tasks = result.scalars().all()
+        count = 0
+        for task in tasks:
+            task.status = "cancelled"
+            task.updated_at = datetime.now()
+            count += 1
+        await session.commit()
+        return count
+
+
+async def delete_today_tasks(user_id: int) -> int:
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Task).where(
+                and_(
+                    Task.user_id == user_id,
+                    Task.status != "cancelled",
+                    Task.scheduled_at >= today_start,
+                    Task.scheduled_at < today_end,
+                )
+            )
+        )
+        tasks = result.scalars().all()
+        count = 0
+        for task in tasks:
+            task.status = "cancelled"
+            task.updated_at = datetime.now()
+            count += 1
+        await session.commit()
+        return count
+
+
+async def rename_task(task_id: int, user_id: int, new_title: str) -> bool:
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Task).where(and_(Task.id == task_id, Task.user_id == user_id))
+        )
+        task = result.scalar_one_or_none()
+        if task:
+            task.title = new_title.strip()
             task.updated_at = datetime.now()
             await session.commit()
             return True
@@ -213,9 +281,10 @@ def format_task(task: Task, show_id: bool = True) -> str:
     pri_emoji = PRIORITY_EMOJI.get(task.priority, "🟡")
     status_emoji = STATUS_EMOJI.get(task.status, "⏳")
 
+    display_num = task.task_number if task.task_number is not None else task.id
     lines = []
     if show_id:
-        lines.append(f"{status_emoji} *#{task.id}* {cat_emoji} {task.title}")
+        lines.append(f"{status_emoji} *#{display_num}* {cat_emoji} {task.title}")
     else:
         lines.append(f"{status_emoji} {cat_emoji} {task.title}")
 

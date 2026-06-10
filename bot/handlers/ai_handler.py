@@ -102,6 +102,20 @@ async def process_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if await handle_note_input(update, context):
         return
 
+    # Проверяем режим переименования задачи
+    if "rename_task_id" in context.user_data:
+        task_id = context.user_data.pop("rename_task_id")
+        from bot.services.task_service import rename_task
+        success = await rename_task(task_id, user.id, user_text)
+        if success:
+            await update.message.reply_text(
+                f"✏️ Задача переименована:\n*{user_text}*",
+                parse_mode="Markdown", reply_markup=main_menu_keyboard()
+            )
+        else:
+            await update.message.reply_text("❌ Задача не найдена.")
+        return
+
     # Проверяем режим переноса задачи
     if "reschedule_task_id" in context.user_data:
         task_id = context.user_data.pop("reschedule_task_id")

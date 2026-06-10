@@ -25,6 +25,8 @@ class Task(Base):
     deadline_at = Column(DateTime, nullable=True)
     reminder_minutes = Column(Integer, nullable=True)
     reminder_sent = Column(Boolean, default=False)
+    deadline_notified = Column(Boolean, default=False)
+    task_number = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -53,3 +55,12 @@ class User(Base):
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migration: add task_number column if missing
+        for sql in [
+            "ALTER TABLE tasks ADD COLUMN task_number INTEGER",
+            "ALTER TABLE tasks ADD COLUMN deadline_notified INTEGER DEFAULT 0",
+        ]:
+            try:
+                await conn.execute(__import__("sqlalchemy").text(sql))
+            except Exception:
+                pass

@@ -33,7 +33,7 @@ async def post_init(application: Application):
     print("✅ Бот запущен!")
 
 
-def main():
+async def main():
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN не задан в .env файле!")
 
@@ -47,8 +47,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ai_message))
 
     print("🚀 Запуск AI-планировщика...")
-    app.run_polling(drop_pending_updates=True)
+    await app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

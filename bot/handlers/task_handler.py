@@ -3,7 +3,8 @@ from telegram.ext import ContextTypes
 from datetime import datetime
 from bot.services.task_service import (
     get_tasks_today, get_tasks_week, get_pending_tasks,
-    complete_task, delete_task, reschedule_task,
+    complete_task, delete_task, reschedule_task, rename_task,
+    delete_all_tasks, delete_today_tasks,
     format_task, get_stats, get_task_by_id,
 )
 from bot.keyboards.main_keyboard import task_action_keyboard, tasks_list_keyboard
@@ -14,15 +15,24 @@ DAYS_RU = {
 }
 
 
-def tasks_keyboard(tasks: list) -> InlineKeyboardMarkup:
+def tasks_keyboard(tasks: list, show_delete_today: bool = False, show_delete_all: bool = False) -> InlineKeyboardMarkup:
     keyboard = []
     for task in tasks[:10]:
         status = "✅" if task.status == "done" else "⏳"
+        display_num = task.task_number if task.task_number is not None else task.id
         keyboard.append([
             InlineKeyboardButton(
-                f"{status} #{task.id} {task.title[:28]}",
+                f"{status} #{display_num} {task.title[:28]}",
                 callback_data=f"task_{task.id}"
             )
+        ])
+    if show_delete_today:
+        keyboard.append([
+            InlineKeyboardButton("🗑 Удалить все задачи на сегодня", callback_data="confirm_del_today")
+        ])
+    if show_delete_all:
+        keyboard.append([
+            InlineKeyboardButton("🗑 Удалить все задачи", callback_data="confirm_del_all")
         ])
     return InlineKeyboardMarkup(keyboard)
 
@@ -46,7 +56,7 @@ async def show_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="Markdown",
-        reply_markup=tasks_keyboard(tasks),
+        reply_markup=tasks_keyboard(tasks, show_delete_today=True),
     )
 
 
@@ -59,21 +69,27 @@ async def show_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     by_day = {}
+    day_sort_key = {}
     for task in tasks:
         if task.scheduled_at:
             day_en = task.scheduled_at.strftime("%A")
             day_ru = DAYS_RU.get(day_en, day_en)
             day = task.scheduled_at.strftime("%d.%m ") + day_ru
+            day_sort_key[day] = task.scheduled_at.date()
         else:
             day = "Без времени"
+            day_sort_key[day] = __import__("datetime").date.max
         by_day.setdefault(day, []).append(task)
+
+    by_day = dict(sorted(by_day.items(), key=lambda x: day_sort_key[x[0]]))
 
     lines = [f"📆 *Задачи на неделю* ({len(tasks)} шт.):\n"]
     for day, day_tasks in by_day.items():
         lines.append(f"*{day}*")
         for task in day_tasks:
             time_str = task.scheduled_at.strftime("%H:%M") if task.scheduled_at else "──"
-            lines.append(f"  🕐 {time_str} — {task.title} [{task.category}] #{task.id}")
+            display_num = task.task_number if task.task_number is not None else task.id
+            lines.append(f"  🕐 {time_str} — {task.title} [{task.category}] #{display_num}")
         lines.append("")
     lines.append("👇 Выбери задачу для управления:")
 
@@ -101,7 +117,7 @@ async def show_pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "\n".join(lines),
         parse_mode="Markdown",
-        reply_markup=tasks_keyboard(tasks),
+        reply_markup=tasks_keyboard(tasks, show_delete_all=True),
     )
 
 
@@ -159,6 +175,20 @@ async def handle_task_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         else:
             await query.edit_message_text("❌ Задача не найдена.")
 
+    elif data.startswith("rename_"):
+        task_id = int(data.split("_")[1])
+        task = await get_task_by_id(task_id, user_id)
+        if task:
+            context.user_data["rename_task_id"] = task_id
+            await query.edit_message_text(
+                f"✏️ *Переименование задачи*\n\n"
+                f"Текущее название: _{task.title}_\n\n"
+                f"Напиши новое название:",
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text("❌ Задача не найдена.")
+
     elif data.startswith("task_"):
         task_id = int(data.split("_")[1])
         task = await get_task_by_id(task_id, user_id)
@@ -170,6 +200,48 @@ async def handle_task_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             )
         else:
             await query.edit_message_text("❌ Задача не найдена.")
+
+    # --- Подтверждение удаления всех задач на сегодня ---
+    elif data == "confirm_del_today":
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Да, удалить", callback_data="do_del_today"),
+                InlineKeyboardButton("❌ Отмена", callback_data="cancel"),
+            ]
+        ])
+        await query.edit_message_text(
+            "⚠️ *Удалить все задачи на сегодня?*\nЭто действие нельзя отменить.",
+            parse_mode="Markdown",
+            reply_markup=kb,
+        )
+
+    elif data == "do_del_today":
+        count = await delete_today_tasks(user_id)
+        await query.edit_message_text(
+            f"🗑 Удалено задач на сегодня: *{count}*",
+            parse_mode="Markdown",
+        )
+
+    # --- Подтверждение удаления всех задач ---
+    elif data == "confirm_del_all":
+        kb = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Да, удалить всё", callback_data="do_del_all"),
+                InlineKeyboardButton("❌ Отмена", callback_data="cancel"),
+            ]
+        ])
+        await query.edit_message_text(
+            "⚠️ *Удалить абсолютно все задачи?*\nЭто действие нельзя отменить.",
+            parse_mode="Markdown",
+            reply_markup=kb,
+        )
+
+    elif data == "do_del_all":
+        count = await delete_all_tasks(user_id)
+        await query.edit_message_text(
+            f"🗑 Удалено задач: *{count}*",
+            parse_mode="Markdown",
+        )
 
     elif data == "cancel":
         await query.edit_message_text("Отменено.")

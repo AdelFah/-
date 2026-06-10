@@ -17,7 +17,10 @@ def task_action_keyboard(task_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("✅ Выполнено", callback_data=f"done_{task_id}"),
             InlineKeyboardButton("🗑 Удалить", callback_data=f"del_{task_id}"),
         ],
-        [InlineKeyboardButton("🔄 Перенести", callback_data=f"move_{task_id}")],
+        [
+            InlineKeyboardButton("🔄 Перенести", callback_data=f"move_{task_id}"),
+            InlineKeyboardButton("✏️ Переименовать", callback_data=f"rename_{task_id}"),
+        ],
     ]
     return InlineKeyboardMarkup(keyboard)
 
