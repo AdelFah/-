@@ -3,17 +3,34 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from datetime import datetime
 import os
+import socket
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+
+def _force_ipv4_url(url: str) -> tuple[str, dict]:
+    """Резолвит hostname в IPv4 и возвращает url + connect_args."""
+    import re
+    match = re.search(r'@([^:/]+):', url)
+    if not match:
+        return url, {}
+    hostname = match.group(1)
+    try:
+        ipv4 = socket.getaddrinfo(hostname, None, socket.AF_INET)[0][4][0]
+        connect_args = {"hostaddr": ipv4}
+        return url, connect_args
+    except Exception:
+        return url, {}
+
+
 if DATABASE_URL:
-    # PostgreSQL (Neon/Supabase) — используем psycopg3
     url = DATABASE_URL
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+psycopg://", 1)
     elif url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-    engine = create_async_engine(url, echo=False)
+    url, connect_args = _force_ipv4_url(url)
+    engine = create_async_engine(url, echo=False, connect_args=connect_args)
     IS_POSTGRES = True
 else:
     os.makedirs("data", exist_ok=True)
