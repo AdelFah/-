@@ -1,4 +1,4 @@
-from openai import AsyncOpenAI
+import anthropic
 import json
 import os
 from datetime import datetime
@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 SYSTEM_PROMPT = """Ты — AI-ассистент для планирования задач в Telegram-боте. Твоя задача — помогать пользователю управлять расписанием, создавать задачи, оптимизировать планы дня и недели.
 
@@ -24,9 +24,9 @@ SYSTEM_PROMPT = """Ты — AI-ассистент для планировани�
 - напоминание (если указано, в минутах до задачи)
 
 Формат ответа — JSON когда нужно выполнить действие:
-{
+{{
   "action": "create_task" | "show_today" | "show_week" | "show_pending" | "complete_task" | "delete_task" | "reschedule_task" | "analyze" | "chat",
-  "task": {
+  "task": {{
     "title": "...",
     "category": "...",
     "scheduled_at": "YYYY-MM-DD HH:MM" или null,
@@ -34,14 +34,13 @@ SYSTEM_PROMPT = """Ты — AI-ассистент для планировани�
     "priority": "low|medium|high",
     "description": "..." или null,
     "reminder_minutes": число или null
-  },
+  }},
   "task_id": число (для complete/delete/reschedule),
   "new_time": "YYYY-MM-DD HH:MM" (для reschedule),
   "message": "Текст ответа пользователю"
-}
+}}
 
 Для обычного разговора или советов используй action: "chat" и пиши ответ в message.
-
 При анализе продуктивности (action: "analyze") дай конкретные советы.
 Будь дружелюбным, лаконичным, используй эмодзи."""
 
@@ -51,17 +50,16 @@ def get_system_prompt() -> str:
 
 
 async def process_message(user_message: str, conversation_history: list) -> dict:
-    messages = [{"role": "system", "content": get_system_prompt()}]
-    messages += conversation_history
-    messages.append({"role": "user", "content": user_message})
+    messages = conversation_history + [{"role": "user", "content": user_message}]
 
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+    response = await client.messages.create(
+        model="claude-sonnet-4-6",
         max_tokens=1024,
+        system=get_system_prompt(),
         messages=messages,
     )
 
-    raw = response.choices[0].message.content.strip()
+    raw = response.content[0].text.strip()
 
     try:
         start = raw.find("{")
@@ -91,12 +89,10 @@ async def analyze_schedule(tasks_today: list, tasks_week: list) -> str:
 
     prompt = f"{tasks_text}\n\nПроанализируй расписание. Найди:\n1. Перегруженные дни\n2. Свободные временные окна\n3. Дай советы по оптимизации\n4. Предупреди о рисках."
 
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+    response = await client.messages.create(
+        model="claude-sonnet-4-6",
         max_tokens=800,
-        messages=[
-            {"role": "system", "content": get_system_prompt()},
-            {"role": "user", "content": prompt},
-        ],
+        system=get_system_prompt(),
+        messages=[{"role": "user", "content": prompt}],
     )
-    return response.choices[0].message.content.strip()
+    return response.content[0].text.strip()

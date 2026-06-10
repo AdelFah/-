@@ -25,8 +25,14 @@ def _parse_datetime(dt_str: str | None) -> datetime | None:
 
 
 async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    await get_or_create_user(user.id, user.full_name)
+    try:
+        user = update.effective_user
+        print(f"[LOG] Сообщение от {user.id}: {update.message.text}")
+        await get_or_create_user(user.id, user.full_name)
+    except Exception as e:
+        print(f"[ОШИБКА init]: {e}")
+        await update.message.reply_text(f"⚠️ Ошибка инициализации: {e}")
+        return
 
     user_text = update.message.text
 
@@ -68,7 +74,12 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.chat.send_action("typing")
 
-    result = await process_message(user_text, context.user_data["history"])
+    try:
+        result = await process_message(user_text, context.user_data["history"])
+    except Exception as e:
+        print(f"[ОШИБКА AI]: {e}")
+        await update.message.reply_text(f"⚠️ Ошибка: {e}")
+        return
 
     # Обновляем историю (храним последние 10 сообщений)
     context.user_data["history"].append({"role": "user", "content": user_text})
