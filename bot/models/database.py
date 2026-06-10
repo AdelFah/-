@@ -4,8 +4,22 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from datetime import datetime
 import os
 
-os.makedirs("data", exist_ok=True)
-engine = create_async_engine("sqlite+aiosqlite:///data/planner.db", echo=False)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    # PostgreSQL (Neon/Supabase) — используем psycopg3
+    url = DATABASE_URL
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    engine = create_async_engine(url, echo=False)
+    IS_POSTGRES = True
+else:
+    os.makedirs("data", exist_ok=True)
+    engine = create_async_engine("sqlite+aiosqlite:///data/planner.db", echo=False)
+    IS_POSTGRES = False
+
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -57,11 +71,12 @@ class User(Base):
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        for sql in [
-            "ALTER TABLE tasks ADD COLUMN task_number INTEGER",
-            "ALTER TABLE tasks ADD COLUMN deadline_notified INTEGER DEFAULT 0",
-        ]:
-            try:
-                await conn.execute(__import__("sqlalchemy").text(sql))
-            except Exception:
-                pass
+        if not IS_POSTGRES:
+            for sql in [
+                "ALTER TABLE tasks ADD COLUMN task_number INTEGER",
+                "ALTER TABLE tasks ADD COLUMN deadline_notified INTEGER DEFAULT 0",
+            ]:
+                try:
+                    await conn.execute(__import__("sqlalchemy").text(sql))
+                except Exception:
+                    pass
