@@ -4,10 +4,10 @@ from datetime import datetime
 from bot.services.task_service import (
     get_tasks_today, get_tasks_week, get_pending_tasks,
     complete_task, delete_task, reschedule_task, rename_task,
-    delete_all_tasks, delete_today_tasks,
-    format_task, get_stats, get_task_by_id,
+    delete_all_tasks, delete_today_tasks, update_task_priority, update_task_category,
+    format_task, get_stats, get_task_by_id, PRIORITY_LABEL, CATEGORY_EMOJI,
 )
-from bot.keyboards.main_keyboard import task_action_keyboard, tasks_list_keyboard
+from bot.keyboards.main_keyboard import task_action_keyboard, tasks_list_keyboard, priority_keyboard, category_keyboard
 
 DAYS_RU = {
     "Monday": "Понедельник", "Tuesday": "Вторник", "Wednesday": "Среда",
@@ -242,6 +242,59 @@ async def handle_task_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             f"🗑 Удалено задач: *{count}*",
             parse_mode="Markdown",
         )
+
+    elif data.startswith("priority_"):
+        task_id = int(data.split("_")[1])
+        task = await get_task_by_id(task_id, user_id)
+        if task:
+            await query.edit_message_text(
+                f"🎯 *Выбери приоритет для:* _{task.title}_",
+                parse_mode="Markdown",
+                reply_markup=priority_keyboard(task_id),
+            )
+        else:
+            await query.edit_message_text("❌ Задача не найдена.")
+
+    elif data.startswith("setpri_"):
+        parts = data.split("_")
+        priority, task_id = parts[1], int(parts[2])
+        success = await update_task_priority(task_id, user_id, priority)
+        if success:
+            task = await get_task_by_id(task_id, user_id)
+            await query.edit_message_text(
+                f"🎯 Приоритет изменён на *{PRIORITY_LABEL[priority]}*\n\n{format_task(task)}",
+                parse_mode="Markdown",
+                reply_markup=task_action_keyboard(task_id),
+            )
+        else:
+            await query.edit_message_text("❌ Задача не найдена.")
+
+    elif data.startswith("category_"):
+        task_id = int(data.split("_")[1])
+        task = await get_task_by_id(task_id, user_id)
+        if task:
+            await query.edit_message_text(
+                f"📂 *Выбери категорию для:* _{task.title}_",
+                parse_mode="Markdown",
+                reply_markup=category_keyboard(task_id),
+            )
+        else:
+            await query.edit_message_text("❌ Задача не найдена.")
+
+    elif data.startswith("setcat_"):
+        parts = data.split("_")
+        category, task_id = parts[1], int(parts[2])
+        success = await update_task_category(task_id, user_id, category)
+        if success:
+            task = await get_task_by_id(task_id, user_id)
+            emoji = CATEGORY_EMOJI.get(category, "📌")
+            await query.edit_message_text(
+                f"📂 Категория изменена на *{emoji} {category.capitalize()}*\n\n{format_task(task)}",
+                parse_mode="Markdown",
+                reply_markup=task_action_keyboard(task_id),
+            )
+        else:
+            await query.edit_message_text("❌ Задача не найдена.")
 
     elif data == "cancel":
         await query.edit_message_text("Отменено.")

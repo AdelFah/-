@@ -1,8 +1,19 @@
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from bot.models.database import Task, User, SessionLocal
 import pytz
+
+TZ = pytz.timezone("Asia/Yekaterinburg")
+
+
+def now_local() -> datetime:
+    return datetime.now(TZ).replace(tzinfo=None)
+
+
+def today_range():
+    start = now_local().replace(hour=0, minute=0, second=0, microsecond=0)
+    return start, start + timedelta(days=1)
 
 
 CATEGORIES = ["учёба", "работа", "питание", "спорт", "отдых", "личные", "бытовые"]
@@ -75,9 +86,8 @@ async def create_task(
 
 
 async def get_tasks_today(user_id: int) -> list[Task]:
+    today_start, today_end = today_range()
     async with SessionLocal() as session:
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
         result = await session.execute(
             select(Task).where(
                 and_(
@@ -92,9 +102,9 @@ async def get_tasks_today(user_id: int) -> list[Task]:
 
 
 async def get_tasks_week(user_id: int) -> list[Task]:
+    today_start, _ = today_range()
+    week_end = today_start + timedelta(days=7)
     async with SessionLocal() as session:
-        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        week_end = today_start + timedelta(days=7)
         result = await session.execute(
             select(Task).where(
                 and_(
@@ -134,7 +144,7 @@ async def complete_task(task_id: int, user_id: int) -> bool:
         task = result.scalar_one_or_none()
         if task:
             task.status = "done"
-            task.updated_at = datetime.now()
+            task.updated_at = now_local()
             await session.commit()
             return True
         return False
@@ -148,7 +158,7 @@ async def delete_task(task_id: int, user_id: int) -> bool:
         task = result.scalar_one_or_none()
         if task:
             task.status = "cancelled"
-            task.updated_at = datetime.now()
+            task.updated_at = now_local()
             await session.commit()
             return True
         return False
@@ -163,15 +173,14 @@ async def delete_all_tasks(user_id: int) -> int:
         count = 0
         for task in tasks:
             task.status = "cancelled"
-            task.updated_at = datetime.now()
+            task.updated_at = now_local()
             count += 1
         await session.commit()
         return count
 
 
 async def delete_today_tasks(user_id: int) -> int:
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    today_start, today_end = today_range()
     async with SessionLocal() as session:
         result = await session.execute(
             select(Task).where(
@@ -187,7 +196,7 @@ async def delete_today_tasks(user_id: int) -> int:
         count = 0
         for task in tasks:
             task.status = "cancelled"
-            task.updated_at = datetime.now()
+            task.updated_at = now_local()
             count += 1
         await session.commit()
         return count
@@ -201,7 +210,7 @@ async def rename_task(task_id: int, user_id: int, new_title: str) -> bool:
         task = result.scalar_one_or_none()
         if task:
             task.title = new_title.strip()
-            task.updated_at = datetime.now()
+            task.updated_at = now_local()
             await session.commit()
             return True
         return False
@@ -215,7 +224,35 @@ async def reschedule_task(task_id: int, user_id: int, new_time: datetime) -> boo
         task = result.scalar_one_or_none()
         if task:
             task.scheduled_at = new_time
-            task.updated_at = datetime.now()
+            task.updated_at = now_local()
+            await session.commit()
+            return True
+        return False
+
+
+async def update_task_priority(task_id: int, user_id: int, priority: str) -> bool:
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Task).where(and_(Task.id == task_id, Task.user_id == user_id))
+        )
+        task = result.scalar_one_or_none()
+        if task:
+            task.priority = priority
+            task.updated_at = now_local()
+            await session.commit()
+            return True
+        return False
+
+
+async def update_task_category(task_id: int, user_id: int, category: str) -> bool:
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Task).where(and_(Task.id == task_id, Task.user_id == user_id))
+        )
+        task = result.scalar_one_or_none()
+        if task:
+            task.category = category
+            task.updated_at = now_local()
             await session.commit()
             return True
         return False
@@ -223,7 +260,7 @@ async def reschedule_task(task_id: int, user_id: int, new_time: datetime) -> boo
 
 async def get_tasks_pending_reminders() -> list[Task]:
     async with SessionLocal() as session:
-        now = datetime.now()
+        now = now_local()
         result = await session.execute(
             select(Task).where(
                 and_(
@@ -295,5 +332,6 @@ def format_task(task: Task, show_id: bool = True) -> str:
     if task.description:
         lines.append(f"   📝 {task.description}")
     lines.append(f"   {pri_emoji} Приоритет: {PRIORITY_LABEL.get(task.priority, task.priority)}")
+    lines.append(f"   {cat_emoji} Категория: {task.category.capitalize()}")
 
     return "\n".join(lines)

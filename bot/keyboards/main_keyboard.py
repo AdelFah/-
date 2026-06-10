@@ -21,13 +21,47 @@ def task_action_keyboard(task_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("🔄 Перенести", callback_data=f"move_{task_id}"),
             InlineKeyboardButton("✏️ Переименовать", callback_data=f"rename_{task_id}"),
         ],
+        [
+            InlineKeyboardButton("🎯 Приоритет", callback_data=f"priority_{task_id}"),
+            InlineKeyboardButton("📂 Категория", callback_data=f"category_{task_id}"),
+        ],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 
+def priority_keyboard(task_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔴 Высокий", callback_data=f"setpri_high_{task_id}"),
+            InlineKeyboardButton("🟡 Средний", callback_data=f"setpri_medium_{task_id}"),
+            InlineKeyboardButton("🟢 Низкий", callback_data=f"setpri_low_{task_id}"),
+        ],
+        [InlineKeyboardButton("◀️ Назад", callback_data=f"task_{task_id}")],
+    ])
+
+
+def category_keyboard(task_id: int) -> InlineKeyboardMarkup:
+    cats = [
+        ("📚 Учёба", "учёба"), ("💼 Работа", "работа"), ("🍽 Питание", "питание"),
+        ("🏋️ Спорт", "спорт"), ("😴 Отдых", "отдых"), ("👤 Личные", "личные"),
+        ("🏠 Бытовые", "бытовые"),
+    ]
+    rows = []
+    row = []
+    for label, val in cats:
+        row.append(InlineKeyboardButton(label, callback_data=f"setcat_{val}_{task_id}"))
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton("◀️ Назад", callback_data=f"task_{task_id}")])
+    return InlineKeyboardMarkup(rows)
+
+
 def tasks_list_keyboard(tasks: list) -> InlineKeyboardMarkup:
     keyboard = []
-    for task in tasks[:10]:  # Показываем максимум 10
+    for task in tasks[:10]:
         status = "✅" if task.status == "done" else "⏳"
         keyboard.append([
             InlineKeyboardButton(
