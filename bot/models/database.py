@@ -46,7 +46,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     telegram_id = Column(Integer, unique=True, nullable=False, index=True)
     name = Column(String(200), nullable=True)
-    timezone = Column(String(50), default="Europe/Moscow")
+    timezone = Column(String(50), default="Asia/Yekaterinburg")
     created_at = Column(DateTime, default=datetime.now)
 
 

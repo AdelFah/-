@@ -4,10 +4,17 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, and_
 from bot.models.database import Task, SessionLocal
 from bot.services.task_service import CATEGORY_EMOJI
+import pytz
+
+TZ = pytz.timezone("Asia/Yekaterinburg")
+
+
+def now_local() -> datetime:
+    return datetime.now(TZ).replace(tzinfo=None)
 
 
 async def check_reminders(bot: Bot):
-    now = datetime.now()
+    now = now_local()
 
     async with SessionLocal() as session:
         # Уведомления за X минут до задачи
@@ -75,7 +82,7 @@ async def check_reminders(bot: Bot):
 
 async def check_deadlines(bot: Bot):
     async with SessionLocal() as session:
-        now = datetime.now()
+        now = now_local()
         soon = now + timedelta(hours=1)
         result = await session.execute(
             select(Task).where(

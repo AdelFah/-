@@ -51,7 +51,10 @@ SYSTEM_PROMPT = """Ты — AI-ассистент для планировани�
 
 
 def get_system_prompt() -> str:
-    return SYSTEM_PROMPT.format(current_datetime=datetime.now().strftime("%Y-%m-%d %H:%M, %A"))
+    import pytz
+    tz = pytz.timezone("Asia/Yekaterinburg")
+    now = datetime.now(tz)
+    return SYSTEM_PROMPT.format(current_datetime=now.strftime("%Y-%m-%d %H:%M, %A"))
 
 
 async def process_message(user_message: str, conversation_history: list) -> dict:
