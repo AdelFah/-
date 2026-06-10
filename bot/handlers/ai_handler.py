@@ -11,6 +11,38 @@ from bot.keyboards.main_keyboard import main_menu_keyboard, task_action_keyboard
 from bot.handlers.note_handler import show_notes_menu, handle_note_input
 
 
+def _parse_datetime_natural(text: str) -> datetime | None:
+    from datetime import date, timedelta
+    import re
+    now = datetime.now()
+    text = text.lower().strip()
+
+    time_match = re.search(r'(\d{1,2})[:\.](\d{2})', text)
+    if not time_match:
+        return None
+    hour, minute = int(time_match.group(1)), int(time_match.group(2))
+
+    if "послезавтра" in text:
+        base = now + timedelta(days=2)
+    elif "завтра" in text:
+        base = now + timedelta(days=1)
+    else:
+        date_match = re.search(r'(\d{1,2})[./](\d{1,2})', text)
+        if date_match:
+            day, month = int(date_match.group(1)), int(date_match.group(2))
+            try:
+                base = datetime(now.year, month, day)
+            except ValueError:
+                base = now
+        else:
+            base = now
+
+    try:
+        return base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    except ValueError:
+        return None
+
+
 def _parse_datetime(dt_str: str | None) -> datetime | None:
     if not dt_str:
         return None
@@ -68,6 +100,27 @@ async def process_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     # Проверяем режим ввода заметки
     if await handle_note_input(update, context):
+        return
+
+    # Проверяем режим переноса задачи
+    if "reschedule_task_id" in context.user_data:
+        task_id = context.user_data.pop("reschedule_task_id")
+        from bot.services.task_service import reschedule_task
+        new_time = _parse_datetime_natural(user_text)
+        if new_time:
+            success = await reschedule_task(task_id, user.id, new_time)
+            if success:
+                await update.message.reply_text(
+                    f"🔄 Задача #{task_id} перенесена на *{new_time.strftime('%d.%m %H:%M')}*",
+                    parse_mode="Markdown", reply_markup=main_menu_keyboard()
+                )
+            else:
+                await update.message.reply_text("❌ Задача не найдена.")
+        else:
+            await update.message.reply_text(
+                "❌ Не понял время. Напиши например: _«завтра в 15:00»_ или _«12.06 в 10:30»_",
+                parse_mode="Markdown"
+            )
         return
 
     await update.message.chat.send_action("typing")

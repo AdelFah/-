@@ -145,6 +145,20 @@ async def handle_task_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         msg = f"🗑 Задача #{task_id} удалена." if success else "❌ Задача не найдена."
         await query.edit_message_text(msg)
 
+    elif data.startswith("move_"):
+        task_id = int(data.split("_")[1])
+        task = await get_task_by_id(task_id, user_id)
+        if task:
+            context.user_data["reschedule_task_id"] = task_id
+            await query.edit_message_text(
+                f"🔄 *Перенос задачи:* {task.title}\n\n"
+                f"Напиши новое время — например:\n"
+                f"_«завтра в 15:00»_ или _«12.06 в 10:30»_",
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text("❌ Задача не найдена.")
+
     elif data.startswith("task_"):
         task_id = int(data.split("_")[1])
         task = await get_task_by_id(task_id, user_id)
