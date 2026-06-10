@@ -8,6 +8,7 @@ from bot.models.database import init_db
 from bot.handlers.start_handler import start_command, help_command
 from bot.handlers.task_handler import handle_task_callback
 from bot.handlers.note_handler import handle_note_callback
+from bot.handlers.voice_handler import handle_voice_message
 from bot.handlers.ai_handler import handle_ai_message
 from bot.services.reminder_service import setup_scheduler
 
@@ -42,6 +43,7 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CallbackQueryHandler(handle_note_callback, pattern="^note_"))
     app.add_handler(CallbackQueryHandler(handle_task_callback))
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ai_message))
 
     print("🚀 Запуск AI-планировщика...")
