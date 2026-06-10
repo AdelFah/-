@@ -1,8 +1,12 @@
 from openai import OpenAI
 import json
+import os
 from datetime import datetime
+from dotenv import load_dotenv
 
-client = OpenAI()
+load_dotenv()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_PROMPT = """Ты — AI-ассистент для планирования задач в Telegram-боте. Твоя задача — помогать пользователю управлять расписанием, создавать задачи, оптимизировать планы дня и недели.
 

@@ -51,7 +51,7 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
         )
         return
-    if user_text == "🤖 Спросить AI":
+    if user_text == "🤖 Спросить ИИ":
         await update.message.reply_text(
             "🤖 Задай мне любой вопрос о твоём расписании или попроси совета!\n\n"
             "Например:\n"

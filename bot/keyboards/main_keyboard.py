@@ -5,7 +5,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         ["📅 Сегодня", "📆 Неделя"],
         ["➕ Добавить задачу", "📋 Все задачи"],
-        ["🤖 Спросить AI", "📊 Аналитика"],
+        ["🤖 Спросить ИИ", "📊 Аналитика"],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
