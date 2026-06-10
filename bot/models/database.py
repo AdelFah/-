@@ -1,0 +1,44 @@
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
+from datetime import datetime
+
+engine = create_async_engine("sqlite+aiosqlite:///data/planner.db", echo=False)
+SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(50), nullable=False, default="личные")
+    status = Column(String(20), nullable=False, default="pending")  # pending|done|cancelled
+    priority = Column(String(10), nullable=False, default="medium")  # low|medium|high
+    scheduled_at = Column(DateTime, nullable=True)
+    deadline_at = Column(DateTime, nullable=True)
+    reminder_minutes = Column(Integer, nullable=True)
+    reminder_sent = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    telegram_id = Column(Integer, unique=True, nullable=False, index=True)
+    name = Column(String(200), nullable=True)
+    timezone = Column(String(50), default="Europe/Moscow")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
