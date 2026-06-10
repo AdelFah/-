@@ -2,6 +2,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from datetime import datetime
+import os
+
+os.makedirs("data", exist_ok=True)
 
 engine = create_async_engine("sqlite+aiosqlite:///data/planner.db", echo=False)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
