@@ -187,13 +187,19 @@ async def mark_reminder_sent(task_id: int):
 async def get_stats(user_id: int) -> dict:
     async with SessionLocal() as session:
         total = await session.execute(
-            select(func.count()).where(Task.user_id == user_id)
+            select(func.count()).where(
+                and_(Task.user_id == user_id, Task.status != "cancelled")
+            )
         )
         done = await session.execute(
-            select(func.count()).where(and_(Task.user_id == user_id, Task.status == "done"))
+            select(func.count()).where(
+                and_(Task.user_id == user_id, Task.status == "done")
+            )
         )
         pending = await session.execute(
-            select(func.count()).where(and_(Task.user_id == user_id, Task.status == "pending"))
+            select(func.count()).where(
+                and_(Task.user_id == user_id, Task.status == "pending")
+            )
         )
         return {
             "total": total.scalar(),
