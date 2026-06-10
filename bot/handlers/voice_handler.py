@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from groq import AsyncGroq
 from dotenv import load_dotenv
@@ -47,7 +47,15 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("❌ Не удалось распознать голосовое сообщение.")
         return
 
-    await update.message.reply_text(f"🎙 Распознано: _{text}_", parse_mode="Markdown")
+    await update.message.reply_text(
+        f"🎙 *Распознано:*\n_{text}_",
+        parse_mode="Markdown",
+    )
+
+    # Если активен режим заметки — сохраняем голосовой текст как заметку
+    from bot.handlers.note_handler import handle_note_input
+    if await handle_note_input(update, context, voice_text=text):
+        return
 
     from bot.handlers.ai_handler import process_user_text
     await process_user_text(update, context, text)

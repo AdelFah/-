@@ -62,6 +62,28 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         msg = "🗑 Заметка удалена." if success else "Заметки на сегодня нет."
         await query.edit_message_text(msg)
 
+    elif data == "voice_to_note":
+        text = context.user_data.get("last_voice_text")
+        if not text:
+            await query.edit_message_text("❌ Текст голосового не найден.")
+            return
+        await save_note(user_id, text)
+        await query.edit_message_text(
+            f"📓 *Заметка сохранена из голосового!*\n\n{text}",
+            parse_mode="Markdown",
+        )
+
+    elif data == "voice_append_note":
+        text = context.user_data.get("last_voice_text")
+        if not text:
+            await query.edit_message_text("❌ Текст голосового не найден.")
+            return
+        note = await append_note(user_id, text)
+        await query.edit_message_text(
+            f"➕ *Добавлено к заметке из голосового!*\n\n{note.text}",
+            parse_mode="Markdown",
+        )
+
     elif data == "note_history":
         notes = await get_recent_notes(user_id)
         if not notes:
@@ -79,13 +101,15 @@ async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text("\n".join(lines), parse_mode="Markdown")
 
 
-async def handle_note_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+async def handle_note_input(update: Update, context: ContextTypes.DEFAULT_TYPE, voice_text: str = None) -> bool:
     mode = context.user_data.get("note_mode")
     if not mode:
         return False
 
     user_id = update.effective_user.id
-    text = update.message.text
+    text = voice_text or update.message.text
+    if not text:
+        return False
     context.user_data.pop("note_mode")
 
     if mode == "write":
