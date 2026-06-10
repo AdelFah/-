@@ -17,27 +17,13 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 
-async def post_init(application: Application):
-    await init_db()
-    scheduler = setup_scheduler(application.bot)
-    scheduler.start()
-    try:
-        await application.bot.set_my_commands([
-            BotCommand("start", "Запустить бота"),
-            BotCommand("help", "Помощь и список команд"),
-        ])
-    except Exception as e:
-        print(f"⚠️ Не удалось установить команды: {e}")
-    print("✅ База данных инициализирована")
-    print("✅ Планировщик напоминаний запущен")
-    print("✅ Бот запущен!")
-
-
 async def main():
     if not TELEGRAM_BOT_TOKEN:
-        raise ValueError("TELEGRAM_BOT_TOKEN не задан в .env файле!")
+        raise ValueError("TELEGRAM_BOT_TOKEN не задан!")
 
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
+    await init_db()
+
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
@@ -46,8 +32,28 @@ async def main():
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ai_message))
 
-    print("🚀 Запуск AI-планировщика...")
-    await app.run_polling(drop_pending_updates=True)
+    scheduler = setup_scheduler(app.bot)
+    scheduler.start()
+
+    try:
+        await app.bot.set_my_commands([
+            BotCommand("start", "Запустить бота"),
+            BotCommand("help", "Помощь"),
+        ])
+    except Exception as e:
+        print(f"⚠️ Не удалось установить команды: {e}")
+
+    print("✅ База данных инициализирована")
+    print("✅ Планировщик запущен")
+    print("🚀 Бот запущен!")
+
+    async with app:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+        await asyncio.Event().wait()  # бесконечное ожидание
+        await app.updater.stop()
+        await app.stop()
 
 
 if __name__ == "__main__":
