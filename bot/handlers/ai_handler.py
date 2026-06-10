@@ -25,17 +25,8 @@ def _parse_datetime(dt_str: str | None) -> datetime | None:
     return None
 
 
-async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user = update.effective_user
-        print(f"[LOG] Сообщение от {user.id}: {update.message.text}")
-        await get_or_create_user(user.id, user.full_name)
-    except Exception as e:
-        print(f"[ОШИБКА init]: {e}")
-        await update.message.reply_text(f"⚠️ Ошибка инициализации: {e}")
-        return
-
-    user_text = update.message.text
+async def process_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE, user_text: str):
+    user = update.effective_user
 
     # Кнопки меню — обрабатываем без AI
     if user_text == "📅 Сегодня":
@@ -166,6 +157,18 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg = result.get("message", "Понял! Чем ещё помочь?")
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=main_menu_keyboard())
+
+
+async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user = update.effective_user
+        print(f"[LOG] Сообщение от {user.id}: {update.message.text}")
+        await get_or_create_user(user.id, user.full_name)
+    except Exception as e:
+        print(f"[ОШИБКА init]: {e}")
+        await update.message.reply_text(f"⚠️ Ошибка инициализации: {e}")
+        return
+    await process_user_text(update, context, update.message.text)
 
 
 async def handle_analytics(update: Update, context: ContextTypes.DEFAULT_TYPE):

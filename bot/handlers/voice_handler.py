@@ -49,7 +49,5 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await update.message.reply_text(f"🎙 Распознано: _{text}_", parse_mode="Markdown")
 
-    # Обрабатываем как обычное текстовое сообщение
-    update.message.text = text
-    from bot.handlers.ai_handler import handle_ai_message
-    await handle_ai_message(update, context)
+    from bot.handlers.ai_handler import process_user_text
+    await process_user_text(update, context, text)
