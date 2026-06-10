@@ -58,6 +58,16 @@ class Note(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    role = Column(String(20), nullable=False)   # user | assistant
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+
 class User(Base):
     __tablename__ = "users"
 

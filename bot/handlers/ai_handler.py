@@ -94,9 +94,9 @@ async def process_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         )
         return
 
-    # Получаем историю диалога из context
-    if "history" not in context.user_data:
-        context.user_data["history"] = []
+    # Загружаем историю из БД
+    from bot.services.history_service import get_history, save_message
+    history = await get_history(user.id)
 
     # Проверяем режим ввода заметки
     if await handle_note_input(update, context):
@@ -140,18 +140,16 @@ async def process_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await update.message.chat.send_action("typing")
 
     try:
-        result = await process_message(user_text, context.user_data["history"])
+        result = await process_message(user_text, history)
     except Exception as e:
         print(f"[ОШИБКА AI]: {e}")
         await update.message.reply_text(f"⚠️ Ошибка: {e}")
         return
 
-    # Обновляем историю (храним последние 10 сообщений)
-    context.user_data["history"].append({"role": "user", "content": user_text})
+    # Сохраняем в БД
+    await save_message(user.id, "user", user_text)
     if result.get("message"):
-        context.user_data["history"].append({"role": "assistant", "content": result.get("message", "")})
-    if len(context.user_data["history"]) > 20:
-        context.user_data["history"] = context.user_data["history"][-20:]
+        await save_message(user.id, "assistant", result.get("message", ""))
 
     action = result.get("action", "chat")
 

@@ -40,6 +40,8 @@ async def main():
     print("✅ Health server запущен")
 
     await init_db()
+    from bot.services.history_service import clear_old_history
+    await clear_old_history(days=7)
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
