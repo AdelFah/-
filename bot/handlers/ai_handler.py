@@ -8,6 +8,7 @@ from bot.services.task_service import (
     get_or_create_user,
 )
 from bot.keyboards.main_keyboard import main_menu_keyboard, task_action_keyboard
+from bot.handlers.note_handler import show_notes_menu, handle_note_input
 
 
 def _parse_datetime(dt_str: str | None) -> datetime | None:
@@ -57,6 +58,8 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
         )
         return
+    if user_text == "📓 Заметки":
+        return await show_notes_menu(update, context)
     if user_text == "🤖 Спросить ИИ":
         await update.message.reply_text(
             "🤖 Задай мне любой вопрос о твоём расписании или попроси совета!\n\n"
@@ -71,6 +74,10 @@ async def handle_ai_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Получаем историю диалога из context
     if "history" not in context.user_data:
         context.user_data["history"] = []
+
+    # Проверяем режим ввода заметки
+    if await handle_note_input(update, context):
+        return
 
     await update.message.chat.send_action("typing")
 
