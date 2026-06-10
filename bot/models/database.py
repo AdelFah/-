@@ -4,24 +4,8 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from datetime import datetime
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if DATABASE_URL:
-    # PostgreSQL на Supabase/Railway
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-    elif DATABASE_URL.startswith("postgresql://"):
-        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-    # Добавляем SSL для Supabase
-    if "supabase" in DATABASE_URL and "ssl=" not in DATABASE_URL:
-        sep = "&" if "?" in DATABASE_URL else "?"
-        DATABASE_URL = DATABASE_URL + sep + "ssl=require"
-    engine = create_async_engine(DATABASE_URL, echo=False)
-else:
-    # Локальная SQLite
-    os.makedirs("data", exist_ok=True)
-    engine = create_async_engine("sqlite+aiosqlite:///data/planner.db", echo=False)
-
+os.makedirs("data", exist_ok=True)
+engine = create_async_engine("sqlite+aiosqlite:///data/planner.db", echo=False)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -73,13 +57,11 @@ class User(Base):
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # SQLite migrations (только для локальной БД)
-        if not DATABASE_URL:
-            for sql in [
-                "ALTER TABLE tasks ADD COLUMN task_number INTEGER",
-                "ALTER TABLE tasks ADD COLUMN deadline_notified INTEGER DEFAULT 0",
-            ]:
-                try:
-                    await conn.execute(__import__("sqlalchemy").text(sql))
-                except Exception:
-                    pass
+        for sql in [
+            "ALTER TABLE tasks ADD COLUMN task_number INTEGER",
+            "ALTER TABLE tasks ADD COLUMN deadline_notified INTEGER DEFAULT 0",
+        ]:
+            try:
+                await conn.execute(__import__("sqlalchemy").text(sql))
+            except Exception:
+                pass
