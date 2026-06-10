@@ -1,5 +1,7 @@
 import asyncio
 import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 from telegram import BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
@@ -15,6 +17,18 @@ from bot.services.reminder_service import setup_scheduler
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 8080))
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"OK")
+        def log_message(self, *args):
+            pass
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
 async def main():
@@ -42,6 +56,8 @@ async def main():
         ])
     except Exception as e:
         print(f"⚠️ Не удалось установить команды: {e}")
+
+    threading.Thread(target=run_health_server, daemon=True).start()
 
     print("✅ База данных инициализирована")
     print("✅ Планировщик запущен")
