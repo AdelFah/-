@@ -35,6 +35,10 @@ async def main():
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN не задан!")
 
+    # HTTP сервер запускаем первым — Render должен увидеть порт
+    threading.Thread(target=run_health_server, daemon=True).start()
+    print("✅ Health server запущен")
+
     await init_db()
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
@@ -56,8 +60,6 @@ async def main():
         ])
     except Exception as e:
         print(f"⚠️ Не удалось установить команды: {e}")
-
-    threading.Thread(target=run_health_server, daemon=True).start()
 
     print("✅ База данных инициализирована")
     print("✅ Планировщик запущен")

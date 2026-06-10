@@ -12,6 +12,10 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
     elif DATABASE_URL.startswith("postgresql://"):
         DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # Добавляем SSL для Supabase
+    if "supabase" in DATABASE_URL and "ssl=" not in DATABASE_URL:
+        sep = "&" if "?" in DATABASE_URL else "?"
+        DATABASE_URL = DATABASE_URL + sep + "ssl=require"
     engine = create_async_engine(DATABASE_URL, echo=False)
 else:
     # Локальная SQLite
