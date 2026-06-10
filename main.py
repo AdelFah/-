@@ -1,6 +1,7 @@
 import asyncio
 import os
 from dotenv import load_dotenv
+from telegram import BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
 from bot.models.database import init_db
@@ -18,6 +19,10 @@ async def post_init(application: Application):
     await init_db()
     scheduler = setup_scheduler(application.bot)
     scheduler.start()
+    await application.bot.set_my_commands([
+        BotCommand("start", "Запустить бота"),
+        BotCommand("help", "Помощь и список команд"),
+    ])
     print("✅ База данных инициализирована")
     print("✅ Планировщик напоминаний запущен")
     print("✅ Бот запущен!")
