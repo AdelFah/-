@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 import json
 import os
 from datetime import datetime
@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_PROMPT = """Ты — AI-ассистент для планирования задач в Telegram-боте. Твоя задача — помогать пользователю управлять расписанием, создавать задачи, оптимизировать планы дня и недели.
 
@@ -55,7 +55,7 @@ async def process_message(user_message: str, conversation_history: list) -> dict
     messages += conversation_history
     messages.append({"role": "user", "content": user_message})
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=1024,
         messages=messages,
@@ -91,7 +91,7 @@ async def analyze_schedule(tasks_today: list, tasks_week: list) -> str:
 
     prompt = f"{tasks_text}\n\nПроанализируй расписание. Найди:\n1. Перегруженные дни\n2. Свободные временные окна\n3. Дай советы по оптимизации\n4. Предупреди о рисках."
 
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=800,
         messages=[
