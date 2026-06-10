@@ -1,9 +1,8 @@
-import anthropic
+from openai import OpenAI
 import json
 from datetime import datetime
-from bot.services.task_service import CATEGORIES
 
-client = anthropic.Anthropic()
+client = OpenAI()
 
 SYSTEM_PROMPT = """Ты — AI-ассистент для планирования задач в Telegram-боте. Твоя задача — помогать пользователю управлять расписанием, создавать задачи, оптимизировать планы дня и недели.
 
@@ -48,19 +47,19 @@ def get_system_prompt() -> str:
 
 
 async def process_message(user_message: str, conversation_history: list) -> dict:
-    messages = conversation_history + [{"role": "user", "content": user_message}]
+    messages = [{"role": "system", "content": get_system_prompt()}]
+    messages += conversation_history
+    messages.append({"role": "user", "content": user_message})
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=1024,
-        system=get_system_prompt(),
         messages=messages,
     )
 
-    raw = response.content[0].text.strip()
+    raw = response.choices[0].message.content.strip()
 
     try:
-        # Пробуем найти JSON в ответе
         start = raw.find("{")
         end = raw.rfind("}") + 1
         if start != -1 and end > start:
@@ -88,10 +87,12 @@ async def analyze_schedule(tasks_today: list, tasks_week: list) -> str:
 
     prompt = f"{tasks_text}\n\nПроанализируй расписание. Найди:\n1. Перегруженные дни\n2. Свободные временные окна\n3. Дай советы по оптимизации\n4. Предупреди о рисках."
 
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=800,
-        system=get_system_prompt(),
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": get_system_prompt()},
+            {"role": "user", "content": prompt},
+        ],
     )
-    return response.content[0].text.strip()
+    return response.choices[0].message.content.strip()
