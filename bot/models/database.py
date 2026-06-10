@@ -25,8 +25,8 @@ class Task(Base):
     deadline_at = Column(DateTime, nullable=True)
     reminder_minutes = Column(Integer, nullable=True)
     reminder_sent = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class Note(Base):
@@ -36,8 +36,8 @@ class Note(Base):
     user_id = Column(Integer, nullable=False, index=True)
     date = Column(String(10), nullable=False)  # YYYY-MM-DD
     text = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class User(Base):
@@ -47,7 +47,7 @@ class User(Base):
     telegram_id = Column(Integer, unique=True, nullable=False, index=True)
     name = Column(String(200), nullable=True)
     timezone = Column(String(50), default="Europe/Moscow")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
 
 
 async def init_db():

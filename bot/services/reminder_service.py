@@ -7,7 +7,7 @@ from bot.services.task_service import CATEGORY_EMOJI
 
 
 async def check_reminders(bot: Bot):
-    now = datetime.utcnow()
+    now = datetime.now()
 
     async with SessionLocal() as session:
         # Уведомления за X минут до задачи
@@ -75,7 +75,7 @@ async def check_reminders(bot: Bot):
 
 async def check_deadlines(bot: Bot):
     async with SessionLocal() as session:
-        now = datetime.utcnow()
+        now = datetime.now()
         soon = now + timedelta(hours=1)
         result = await session.execute(
             select(Task).where(
@@ -90,7 +90,7 @@ async def check_deadlines(bot: Bot):
         tasks = result.scalars().all()
 
     for task in tasks:
-        minutes_left = int((task.deadline_at - datetime.utcnow()).total_seconds() / 60)
+        minutes_left = int((task.deadline_at - datetime.now()).total_seconds() / 60)
         text = (
             f"⚠️ *Дедлайн приближается!*\n\n"
             f"📌 *{task.title}*\n"

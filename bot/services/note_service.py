@@ -29,7 +29,7 @@ async def save_note(user_id: int, text: str) -> Note:
         note = result.scalar_one_or_none()
         if note:
             note.text = text
-            note.updated_at = datetime.utcnow()
+            note.updated_at = datetime.now()
         else:
             note = Note(user_id=user_id, date=today, text=text)
             session.add(note)
@@ -47,7 +47,7 @@ async def append_note(user_id: int, text: str) -> Note:
         note = result.scalar_one_or_none()
         if note:
             note.text = note.text + "\n\n" + text
-            note.updated_at = datetime.utcnow()
+            note.updated_at = datetime.now()
         else:
             note = Note(user_id=user_id, date=today, text=text)
             session.add(note)

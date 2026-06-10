@@ -61,7 +61,7 @@ async def create_task(
 
 async def get_tasks_today(user_id: int) -> list[Task]:
     async with SessionLocal() as session:
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
         result = await session.execute(
             select(Task).where(
@@ -78,7 +78,7 @@ async def get_tasks_today(user_id: int) -> list[Task]:
 
 async def get_tasks_week(user_id: int) -> list[Task]:
     async with SessionLocal() as session:
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         week_end = today_start + timedelta(days=7)
         result = await session.execute(
             select(Task).where(
@@ -119,7 +119,7 @@ async def complete_task(task_id: int, user_id: int) -> bool:
         task = result.scalar_one_or_none()
         if task:
             task.status = "done"
-            task.updated_at = datetime.utcnow()
+            task.updated_at = datetime.now()
             await session.commit()
             return True
         return False
@@ -133,7 +133,7 @@ async def delete_task(task_id: int, user_id: int) -> bool:
         task = result.scalar_one_or_none()
         if task:
             task.status = "cancelled"
-            task.updated_at = datetime.utcnow()
+            task.updated_at = datetime.now()
             await session.commit()
             return True
         return False
@@ -147,7 +147,7 @@ async def reschedule_task(task_id: int, user_id: int, new_time: datetime) -> boo
         task = result.scalar_one_or_none()
         if task:
             task.scheduled_at = new_time
-            task.updated_at = datetime.utcnow()
+            task.updated_at = datetime.now()
             await session.commit()
             return True
         return False
@@ -155,7 +155,7 @@ async def reschedule_task(task_id: int, user_id: int, new_time: datetime) -> boo
 
 async def get_tasks_pending_reminders() -> list[Task]:
     async with SessionLocal() as session:
-        now = datetime.utcnow()
+        now = datetime.now()
         result = await session.execute(
             select(Task).where(
                 and_(
