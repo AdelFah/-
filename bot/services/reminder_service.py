@@ -47,8 +47,7 @@ async def check_reminders(bot: Bot):
                 except Exception as e:
                     print(f"[ОШИБКА напоминания] задача {task.id}: {e}")
 
-        # Уведомление точно в момент задачи (если reminder_minutes не задан)
-        window_start = now - timedelta(minutes=1)
+        # Уведомление в момент задачи (если reminder_minutes не задан)
         result2 = await session.execute(
             select(Task).where(
                 and_(
@@ -56,7 +55,6 @@ async def check_reminders(bot: Bot):
                     Task.reminder_minutes.is_(None),
                     Task.reminder_sent == False,
                     Task.scheduled_at.isnot(None),
-                    Task.scheduled_at >= window_start,
                     Task.scheduled_at <= now,
                 )
             )

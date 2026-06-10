@@ -228,17 +228,56 @@ async def handle_analytics(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     await update.message.chat.send_action("typing")
 
+    from bot.services.task_service import get_stats, get_pending_tasks, CATEGORY_EMOJI
+    from bot.services.task_service import get_tasks_today, get_tasks_week
+
+    stats = await get_stats(user_id)
     tasks_today = await get_tasks_today(user_id)
     tasks_week = await get_tasks_week(user_id)
+    pending = await get_pending_tasks(user_id)
 
-    if not tasks_today and not tasks_week:
-        await update.message.reply_text(
-            "📊 У тебя пока нет запланированных задач.\nДобавь несколько задач, и я проанализирую твоё расписание!"
-        )
-        return
+    total = stats["total"]
+    done = stats["done"]
+    p = stats["pending"]
+    pct = round(done / total * 100) if total > 0 else 0
+    bar = "🟩" * (pct // 10) + "⬜" * (10 - pct // 10)
 
-    analysis = await analyze_schedule(tasks_today, tasks_week)
-    await update.message.reply_text(
-        f"📊 *Анализ твоего расписания:*\n\n{analysis}",
-        parse_mode="Markdown",
-    )
+    # Статистика по категориям
+    cat_count = {}
+    for task in pending:
+        cat_count[task.category] = cat_count.get(task.category, 0) + 1
+
+    lines = [
+        "📊 *Аналитика твоего планировщика*\n",
+        f"📌 Всего задач: {total}",
+        f"✅ Выполнено: {done}",
+        f"⏳ Осталось: {p}",
+        f"📈 Прогресс: {pct}%",
+        f"{bar}\n",
+    ]
+
+    if tasks_today:
+        done_today = sum(1 for t in tasks_today if t.status == "done")
+        lines.append(f"📅 *Сегодня:* {len(tasks_today)} задач, выполнено {done_today}\n")
+
+    if tasks_week:
+        lines.append(f"📆 *На неделю:* {len(tasks_week)} задач\n")
+
+    if cat_count:
+        lines.append("📂 *По категориям (невыполненные):*")
+        for cat, cnt in sorted(cat_count.items(), key=lambda x: -x[1]):
+            emoji = CATEGORY_EMOJI.get(cat, "📌")
+            lines.append(f"  {emoji} {cat.capitalize()}: {cnt}")
+        lines.append("")
+
+    # Советы
+    if p == 0:
+        lines.append("🎉 Все задачи выполнены! Отличная работа!")
+    elif p > 10:
+        lines.append("⚠️ *Совет:* Много невыполненных задач. Попробуй расставить приоритеты!")
+    elif pct >= 70:
+        lines.append("💪 *Отлично!* Ты выполняешь большинство задач. Так держать!")
+    else:
+        lines.append("📝 *Совет:* Добавь задачи на неделю чтобы лучше планировать время.")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
