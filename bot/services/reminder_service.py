@@ -1,40 +1,76 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram import Bot
-from bot.services.task_service import (
-    get_tasks_pending_reminders, mark_reminder_sent,
-    CATEGORY_EMOJI, PRIORITY_EMOJI,
-)
 from datetime import datetime, timedelta
 from sqlalchemy import select, and_
-from bot.models.database import Task, User, SessionLocal
+from bot.models.database import Task, SessionLocal
+from bot.services.task_service import CATEGORY_EMOJI
 
 
 async def check_reminders(bot: Bot):
-    tasks = await get_tasks_pending_reminders()
-    for task in tasks:
-        # Получаем telegram_id пользователя
-        async with SessionLocal() as session:
-            result = await session.execute(
-                select(User).where(User.telegram_id == task.user_id)
+    now = datetime.utcnow()
+
+    async with SessionLocal() as session:
+        # Уведомления за X минут до задачи
+        result = await session.execute(
+            select(Task).where(
+                and_(
+                    Task.status == "pending",
+                    Task.reminder_minutes.isnot(None),
+                    Task.reminder_sent == False,
+                    Task.scheduled_at.isnot(None),
+                )
             )
-            # user_id в Task — это telegram_id
-            user = result.scalar_one_or_none()
-
-        cat_emoji = CATEGORY_EMOJI.get(task.category, "📌")
-        time_str = task.scheduled_at.strftime("%H:%M") if task.scheduled_at else ""
-
-        text = (
-            f"🔔 *Напоминание!*\n\n"
-            f"{cat_emoji} *{task.title}*\n"
-            f"🕐 Начало в {time_str}\n"
-            f"⏰ Через {task.reminder_minutes} мин."
         )
+        tasks_with_reminder = result.scalars().all()
 
-        try:
-            await bot.send_message(chat_id=task.user_id, text=text, parse_mode="Markdown")
-            await mark_reminder_sent(task.id)
-        except Exception as e:
-            print(f"Ошибка отправки напоминания для задачи {task.id}: {e}")
+        for task in tasks_with_reminder:
+            remind_at = task.scheduled_at - timedelta(minutes=task.reminder_minutes)
+            if remind_at <= now:
+                cat_emoji = CATEGORY_EMOJI.get(task.category, "📌")
+                time_str = task.scheduled_at.strftime("%H:%M")
+                text = (
+                    f"🔔 *Напоминание!*\n\n"
+                    f"{cat_emoji} *{task.title}*\n"
+                    f"🕐 Начало в {time_str}\n"
+                    f"⏰ Через {task.reminder_minutes} мин."
+                )
+                try:
+                    await bot.send_message(chat_id=task.user_id, text=text, parse_mode="Markdown")
+                    task.reminder_sent = True
+                except Exception as e:
+                    print(f"[ОШИБКА напоминания] задача {task.id}: {e}")
+
+        # Уведомление точно в момент задачи (если reminder_minutes не задан)
+        window_start = now - timedelta(minutes=1)
+        result2 = await session.execute(
+            select(Task).where(
+                and_(
+                    Task.status == "pending",
+                    Task.reminder_minutes.is_(None),
+                    Task.reminder_sent == False,
+                    Task.scheduled_at.isnot(None),
+                    Task.scheduled_at >= window_start,
+                    Task.scheduled_at <= now,
+                )
+            )
+        )
+        tasks_at_time = result2.scalars().all()
+
+        for task in tasks_at_time:
+            cat_emoji = CATEGORY_EMOJI.get(task.category, "📌")
+            time_str = task.scheduled_at.strftime("%H:%M")
+            text = (
+                f"⏰ *Пора!*\n\n"
+                f"{cat_emoji} *{task.title}*\n"
+                f"🕐 Запланировано на {time_str}"
+            )
+            try:
+                await bot.send_message(chat_id=task.user_id, text=text, parse_mode="Markdown")
+                task.reminder_sent = True
+            except Exception as e:
+                print(f"[ОШИБКА уведомления] задача {task.id}: {e}")
+
+        await session.commit()
 
 
 async def check_deadlines(bot: Bot):
@@ -64,7 +100,7 @@ async def check_deadlines(bot: Bot):
         try:
             await bot.send_message(chat_id=task.user_id, text=text, parse_mode="Markdown")
         except Exception as e:
-            print(f"Ошибка уведомления о дедлайне {task.id}: {e}")
+            print(f"[ОШИБКА дедлайна] задача {task.id}: {e}")
 
 
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:

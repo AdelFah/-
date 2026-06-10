@@ -16,6 +16,7 @@ CATEGORY_EMOJI = {
     "бытовые": "🏠",
 }
 PRIORITY_EMOJI = {"low": "🟢", "medium": "🟡", "high": "🔴"}
+PRIORITY_LABEL = {"low": "Низкий", "medium": "Средний", "high": "Высокий"}
 STATUS_EMOJI = {"pending": "⏳", "done": "✅", "cancelled": "❌"}
 
 
@@ -218,6 +219,6 @@ def format_task(task: Task, show_id: bool = True) -> str:
         lines.append(f"   ⚠️ Дедлайн: {task.deadline_at.strftime('%d.%m %H:%M')}")
     if task.description:
         lines.append(f"   📝 {task.description}")
-    lines.append(f"   {pri_emoji} Приоритет: {task.priority}")
+    lines.append(f"   {pri_emoji} Приоритет: {PRIORITY_LABEL.get(task.priority, task.priority)}")
 
     return "\n".join(lines)

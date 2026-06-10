@@ -4,9 +4,15 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
-client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
+
+def get_client():
+    key = os.getenv("GROQ_API_KEY")
+    if not key:
+        raise ValueError("GROQ_API_KEY не найден в .env файле!")
+    return AsyncGroq(api_key=key)
+
 
 SYSTEM_PROMPT = """Ты — AI-ассистент для планирования задач в Telegram-боте. Твоя задача — помогать пользователю управлять расписанием, создавать задачи, оптимизировать планы дня и недели.
 
@@ -41,7 +47,6 @@ SYSTEM_PROMPT = """Ты — AI-ассистент для планировани�
 }}
 
 Для обычного разговора используй action: "chat".
-При анализе расписания используй action: "analyze".
 Всегда отвечай на русском языке. Будь дружелюбным, используй эмодзи."""
 
 
@@ -50,6 +55,7 @@ def get_system_prompt() -> str:
 
 
 async def process_message(user_message: str, conversation_history: list) -> dict:
+    client = get_client()
     messages = [{"role": "system", "content": get_system_prompt()}]
     messages += conversation_history
     messages.append({"role": "user", "content": user_message})
@@ -76,11 +82,11 @@ async def process_message(user_message: str, conversation_history: list) -> dict
 
 
 async def analyze_schedule(tasks_today: list, tasks_week: list) -> str:
+    client = get_client()
     tasks_text = "Задачи на сегодня:\n"
     for t in tasks_today:
         time_str = t.scheduled_at.strftime("%H:%M") if t.scheduled_at else "без времени"
         tasks_text += f"- {time_str}: {t.title} [{t.category}]\n"
-
     if not tasks_today:
         tasks_text += "- нет задач\n"
 
@@ -89,14 +95,12 @@ async def analyze_schedule(tasks_today: list, tasks_week: list) -> str:
         time_str = t.scheduled_at.strftime("%d.%m %H:%M") if t.scheduled_at else "без времени"
         tasks_text += f"- {time_str}: {t.title} [{t.category}]\n"
 
-    prompt = f"{tasks_text}\n\nПроанализируй расписание на русском языке. Найди перегруженные дни, свободные окна, дай советы."
-
     response = await client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         max_tokens=800,
         messages=[
             {"role": "system", "content": get_system_prompt()},
-            {"role": "user", "content": prompt},
+            {"role": "user", "content": f"{tasks_text}\n\nПроанализируй расписание на русском языке."},
         ],
     )
     return response.choices[0].message.content.strip()

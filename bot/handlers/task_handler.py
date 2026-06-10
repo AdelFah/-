@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from datetime import datetime
 from bot.services.task_service import (
@@ -7,6 +7,24 @@ from bot.services.task_service import (
     format_task, get_stats, get_task_by_id,
 )
 from bot.keyboards.main_keyboard import task_action_keyboard, tasks_list_keyboard
+
+DAYS_RU = {
+    "Monday": "Понедельник", "Tuesday": "Вторник", "Wednesday": "Среда",
+    "Thursday": "Четверг", "Friday": "Пятница", "Saturday": "Суббота", "Sunday": "Воскресенье"
+}
+
+
+def tasks_keyboard(tasks: list) -> InlineKeyboardMarkup:
+    keyboard = []
+    for task in tasks[:10]:
+        status = "✅" if task.status == "done" else "⏳"
+        keyboard.append([
+            InlineKeyboardButton(
+                f"{status} #{task.id} {task.title[:28]}",
+                callback_data=f"task_{task.id}"
+            )
+        ])
+    return InlineKeyboardMarkup(keyboard)
 
 
 async def show_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -23,8 +41,13 @@ async def show_today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for task in tasks:
         lines.append(format_task(task))
         lines.append("")
+    lines.append("👇 Выбери задачу для управления:")
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=tasks_keyboard(tasks),
+    )
 
 
 async def show_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -35,11 +58,12 @@ async def show_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📆 На эту неделю задач нет.")
         return
 
-    # Группируем по дням
     by_day = {}
     for task in tasks:
         if task.scheduled_at:
-            day = task.scheduled_at.strftime("%d.%m %A")
+            day_en = task.scheduled_at.strftime("%A")
+            day_ru = DAYS_RU.get(day_en, day_en)
+            day = task.scheduled_at.strftime("%d.%m ") + day_ru
         else:
             day = "Без времени"
         by_day.setdefault(day, []).append(task)
@@ -49,11 +73,15 @@ async def show_week(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(f"*{day}*")
         for task in day_tasks:
             time_str = task.scheduled_at.strftime("%H:%M") if task.scheduled_at else "──"
-            cat = task.category
-            lines.append(f"  🕐 {time_str} — {task.title} [{cat}] #{task.id}")
+            lines.append(f"  🕐 {time_str} — {task.title} [{task.category}] #{task.id}")
         lines.append("")
+    lines.append("👇 Выбери задачу для управления:")
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await update.message.reply_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=tasks_keyboard(tasks),
+    )
 
 
 async def show_pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -68,11 +96,12 @@ async def show_pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for task in tasks[:15]:
         lines.append(format_task(task))
         lines.append("")
+    lines.append("👇 Выбери задачу для управления:")
 
-    msg = await update.message.reply_text(
+    await update.message.reply_text(
         "\n".join(lines),
         parse_mode="Markdown",
-        reply_markup=tasks_list_keyboard(tasks),
+        reply_markup=tasks_keyboard(tasks),
     )
 
 
@@ -107,29 +136,26 @@ async def handle_task_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     if data.startswith("done_"):
         task_id = int(data.split("_")[1])
         success = await complete_task(task_id, user_id)
-        if success:
-            await query.edit_message_text(f"✅ Задача #{task_id} выполнена! Молодец!")
-        else:
-            await query.edit_message_text("❌ Задача не найдена.")
+        msg = f"✅ Задача #{task_id} выполнена! Молодец!" if success else "❌ Задача не найдена."
+        await query.edit_message_text(msg)
 
     elif data.startswith("del_"):
         task_id = int(data.split("_")[1])
         success = await delete_task(task_id, user_id)
-        if success:
-            await query.edit_message_text(f"🗑 Задача #{task_id} удалена.")
-        else:
-            await query.edit_message_text("❌ Задача не найдена.")
+        msg = f"🗑 Задача #{task_id} удалена." if success else "❌ Задача не найдена."
+        await query.edit_message_text(msg)
 
     elif data.startswith("task_"):
         task_id = int(data.split("_")[1])
         task = await get_task_by_id(task_id, user_id)
         if task:
-            text = format_task(task)
             await query.edit_message_text(
-                text,
+                format_task(task),
                 parse_mode="Markdown",
                 reply_markup=task_action_keyboard(task_id),
             )
+        else:
+            await query.edit_message_text("❌ Задача не найдена.")
 
     elif data == "cancel":
         await query.edit_message_text("Отменено.")

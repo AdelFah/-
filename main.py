@@ -19,10 +19,13 @@ async def post_init(application: Application):
     await init_db()
     scheduler = setup_scheduler(application.bot)
     scheduler.start()
-    await application.bot.set_my_commands([
-        BotCommand("start", "Запустить бота"),
-        BotCommand("help", "Помощь и список команд"),
-    ])
+    try:
+        await application.bot.set_my_commands([
+            BotCommand("start", "Запустить бота"),
+            BotCommand("help", "Помощь и список команд"),
+        ])
+    except Exception as e:
+        print(f"⚠️ Не удалось установить команды: {e}")
     print("✅ База данных инициализирована")
     print("✅ Планировщик напоминаний запущен")
     print("✅ Бот запущен!")
